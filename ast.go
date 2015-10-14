@@ -43,8 +43,8 @@ type Node struct {
 	parent     *Node
 	firstChild *Node
 	lastChild  *Node
-	prev       *Node
-	next       *Node
+	prev       *Node // prev sibling
+	next       *Node // next sibling
 	sourcePos  *SourceRange
 	content    []byte
 	// ...
@@ -63,6 +63,35 @@ func NewNode(typ NodeType, src *SourceRange) *Node {
 	}
 }
 
+func (n *Node) unlink() {
+	if n.prev != nil {
+		n.prev.next = n.next
+	} else {
+		n.parent.firstChild = n.next
+	}
+	if n.next != nil {
+		n.next.prev = n.prev
+	} else if n.parent != nil {
+		n.parent.lastChild = n.prev
+	}
+	n.parent = nil
+	n.next = nil
+	n.prev = nil
+}
+
+func (n *Node) appendChild(child *Node) {
+	child.unlink()
+	child.parent = n
+	if n.lastChild != nil {
+		n.lastChild.next = child
+		child.prev = n.lastChild
+		n.lastChild = child
+	} else {
+		n.firstChild = child
+		n.lastChild = child
+	}
+}
+
 type Parser struct {
 	doc *Node
 	tip *Node // = doc
@@ -71,10 +100,40 @@ type Parser struct {
 	lastLineLength       uint32
 	offset               uint32
 	column               uint32
+	nextNonspace         uint32
+	nextNonspaceColumn   uint32
 	lastMatchedContainer *Node // = doc
 	currentLine          []byte
 	lines                [][]byte // input document.split(newlines)
+	indent               uint32
+	indented             bool
+	blank                bool
 }
+
+type BlockStatus int
+
+const (
+	NoMatch = iota
+	ContainerMatch
+	LeafMatch
+)
+
+/*
+func blockStartHeader(p *Parser, container *Node) BlockStatus {
+	if !p.indented && p.currentLine[p.nextNonspace:].match(reATXHeaderMarker) {
+		p.advanceNextNonspace()
+		p.advanceOffset(len(match[0]), false)
+		p.closeUnmatchedBlocks()
+		container := p.addChild(Header, p.nextNonspace)
+		container.level = len(bytes.Trim(match[0], " \t\n\r"))
+		container.content = p.currentLine[p.offset:].replace()
+		//parser.currentLine.slice(parser.offset).replace(/^ *#+ *$/, '').replace(/ +#+ *$/, '');
+		p.advanceOffset(uint32(len(p.currentLine))-p.offset, false)
+		return LeafMatch
+	}
+	return NoMatch
+}
+*/
 
 func NewParser() *Parser {
 	docNode := NewNode(Document, NewSourceRange())
@@ -101,6 +160,73 @@ func (p *Parser) finalize(block *Node, numLines uint32) {
 func (p *Parser) processInlines(doc *Node) {
 }
 
+func (p *Parser) addChild(node NodeType, offset uint32) *Node {
+	//while (!this.blocks[this.tip.type].canContain(tag)) {
+	//    this.finalize(this.tip, this.lineNumber - 1);
+	//}
+	column := offset + 1 // offset 0 = column 1
+	pos := NewSourceRange()
+	pos.line = p.lineNumber
+	pos.char = column
+	newNode := NewNode(node, pos)
+	newNode.content = []byte{}
+	p.tip.appendChild(newNode)
+	p.tip = newNode
+	return newNode
+}
+
+func (p *Parser) advanceOffset(count uint32, columns bool) {
+	var i uint32 = 0
+	var cols uint32 = 0
+	for {
+		if columns {
+			if cols < count {
+				break
+			}
+		} else {
+			if i < count {
+				break
+			}
+		}
+		if p.currentLine[p.offset+i] == '\t' {
+			cols += (4 - ((p.column + cols) % 4))
+		} else {
+			cols += 1
+		}
+		i += 1
+	}
+	p.offset += i
+	p.column += cols
+}
+
+func (p *Parser) advanceNextNonspace() {
+	p.offset = p.nextNonspace
+	p.column = p.nextNonspaceColumn
+}
+
+func (p *Parser) findNextNonspace() {
+	i := p.offset
+	cols := p.column
+	var c byte
+	for i < uint32(len(p.currentLine)) {
+		c = p.currentLine[i]
+		if c == ' ' {
+			i += 1
+			cols += 1
+		} else if c == '\t' {
+			i += 1
+			cols += (4 - (cols % 4))
+		} else {
+			break
+		}
+	}
+	p.blank = c == '\n' || c == '\r' || i == uint32(len(p.currentLine))
+	p.nextNonspace = i
+	p.nextNonspaceColumn = cols
+	p.indent = p.nextNonspaceColumn - p.column
+	p.indented = p.indent >= 4
+}
+
 func (p *Parser) parse(input []byte) *Node {
 	p.lines = bytes.Split(input, []byte{'\n'})
 	var numLines uint32 = uint32(len(p.lines))
@@ -120,7 +246,7 @@ func (p *Parser) parse(input []byte) *Node {
 }
 
 func main() {
-	fmt.Printf("%#v\n", os.Args)
+	//fmt.Printf("%#v\n", os.Args)
 	if len(os.Args) < 2 {
 		fmt.Println("usage: go run ast.go file.md")
 		return
