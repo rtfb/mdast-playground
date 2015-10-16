@@ -5,6 +5,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"regexp"
+)
+
+var (
+	reATXHeaderMarker = regexp.MustCompile("^#{1,6}(?: +|$)")
 )
 
 type NodeType int
@@ -47,6 +52,7 @@ type Node struct {
 	next       *Node // next sibling
 	sourcePos  *SourceRange
 	content    []byte
+	level      uint32
 	// ...
 }
 
@@ -118,22 +124,23 @@ const (
 	LeafMatch
 )
 
-/*
 func blockStartHeader(p *Parser, container *Node) BlockStatus {
-	if !p.indented && p.currentLine[p.nextNonspace:].match(reATXHeaderMarker) {
+	reLeft := regexp.MustCompile("^ *#+ *$")
+	reRight := regexp.MustCompile(" +#+ *$")
+	match := reATXHeaderMarker.Find(p.currentLine[p.nextNonspace:])
+	if !p.indented && match != nil {
 		p.advanceNextNonspace()
-		p.advanceOffset(len(match[0]), false)
+		p.advanceOffset(uint32(len(match)), false)
 		p.closeUnmatchedBlocks()
 		container := p.addChild(Header, p.nextNonspace)
-		container.level = len(bytes.Trim(match[0], " \t\n\r"))
-		container.content = p.currentLine[p.offset:].replace()
+		container.level = uint32(len(bytes.Trim(match, " \t\n\r"))) // number of #s
+		container.content = reRight.ReplaceAll(reLeft.ReplaceAll(p.currentLine[p.offset:], []byte{}), []byte{})
 		//parser.currentLine.slice(parser.offset).replace(/^ *#+ *$/, '').replace(/ +#+ *$/, '');
 		p.advanceOffset(uint32(len(p.currentLine))-p.offset, false)
 		return LeafMatch
 	}
 	return NoMatch
 }
-*/
 
 func NewParser() *Parser {
 	docNode := NewNode(Document, NewSourceRange())
@@ -151,7 +158,10 @@ func NewParser() *Parser {
 }
 
 func (p *Parser) incorporateLine(line []byte) {
-	fmt.Println(string(line))
+	p.lineNumber += 1
+	fmt.Printf("%3d: %s\n", p.lineNumber, string(line))
+	//st := blockStartHeader(p, p.doc)
+	//println(st)
 }
 
 func (p *Parser) finalize(block *Node, numLines uint32) {
@@ -202,6 +212,10 @@ func (p *Parser) advanceOffset(count uint32, columns bool) {
 func (p *Parser) advanceNextNonspace() {
 	p.offset = p.nextNonspace
 	p.column = p.nextNonspaceColumn
+}
+
+func (p *Parser) closeUnmatchedBlocks() {
+	// TODO
 }
 
 func (p *Parser) findNextNonspace() {
