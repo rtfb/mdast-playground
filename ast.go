@@ -277,6 +277,19 @@ func (p *Parser) parse(input []byte) *Node {
 	return p.doc
 }
 
+func dump(ast *Node, depth int) {
+	indent := ""
+	for i := 0; i < depth; i += 1 {
+		indent += "\t"
+	}
+	fmt.Printf("%s%s\n", indent, ast.Type)
+	//fmt.Printf("%s%#v\n", indent, ast)
+	//fmt.Printf("%s%#v\n", indent, ast.firstChild)
+	for n := ast.firstChild; n != nil; n = n.next {
+		dump(n, depth+1)
+	}
+}
+
 func main() {
 	//fmt.Printf("%#v\n", os.Args)
 	if len(os.Args) < 2 {
@@ -288,5 +301,6 @@ func main() {
 		panic(err)
 	}
 	p := NewParser()
-	p.parse(bytes)
+	ast := p.parse(bytes)
+	dump(ast, 0)
 }
