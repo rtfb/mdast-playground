@@ -27,6 +27,23 @@ const (
 	Image
 )
 
+var nodeTypeNames = []string{
+	Document:   "Document",
+	BlockQuote: "BlockQuote",
+	List:       "List",
+	Item:       "Item",
+	Paragraph:  "Paragraph",
+	Header:     "Header",
+	Emph:       "Emph",
+	Strong:     "Strong",
+	Link:       "Link",
+	Image:      "Image",
+}
+
+func (t NodeType) String() string {
+	return nodeTypeNames[t]
+}
+
 type SourceRange struct {
 	line    uint32 // line # in the source document
 	char    uint32 // char pos in line
