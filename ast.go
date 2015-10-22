@@ -72,7 +72,7 @@ func NewNode(typ NodeType, src *SourceRange) *Node {
 func (n *Node) unlink() {
 	if n.prev != nil {
 		n.prev.next = n.next
-	} else {
+	} else if n.parent != nil {
 		n.parent.firstChild = n.next
 	}
 	if n.next != nil {
