@@ -176,8 +176,9 @@ func NewParser() *Parser {
 
 func (p *Parser) incorporateLine(line []byte) {
 	p.lineNumber += 1
+	p.currentLine = line
 	fmt.Printf("%3d: %s\n", p.lineNumber, string(line))
-	//st := blockStartHeader(p, p.doc)
+	/*st := */ blockStartHeader(p, p.doc)
 	//println(st)
 }
 
