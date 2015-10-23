@@ -53,8 +53,16 @@ var blockHandlers = map[NodeType]BlockHandler{
 	HorizontalRule: &HorizontalRuleBlockHandler{},
 }
 
+type ContinueStatus int
+
+const (
+	Matched = iota
+	NotMatched
+	Completed
+)
+
 type BlockHandler interface {
-	Continue(p *Parser) bool
+	Continue(p *Parser, container *Node) ContinueStatus
 	Finalize(p *Parser, block *Node)
 	CanContain(t NodeType) bool
 	AcceptsLines() bool
@@ -63,9 +71,9 @@ type BlockHandler interface {
 type HeaderBlockHandler struct {
 }
 
-func (h *HeaderBlockHandler) Continue(p *Parser) bool {
+func (h *HeaderBlockHandler) Continue(p *Parser, container *Node) ContinueStatus {
 	// a header can never contain > 1 line, so fail to match:
-	return true
+	return NotMatched
 }
 
 func (h *HeaderBlockHandler) Finalize(p *Parser, block *Node) {
@@ -82,8 +90,8 @@ func (h *HeaderBlockHandler) AcceptsLines() bool {
 type DocumentBlockHandler struct {
 }
 
-func (h *DocumentBlockHandler) Continue(p *Parser) bool {
-	return false
+func (h *DocumentBlockHandler) Continue(p *Parser, container *Node) ContinueStatus {
+	return Matched
 }
 
 func (h *DocumentBlockHandler) Finalize(p *Parser, block *Node) {
@@ -100,9 +108,9 @@ func (h *DocumentBlockHandler) AcceptsLines() bool {
 type HorizontalRuleBlockHandler struct {
 }
 
-func (h *HorizontalRuleBlockHandler) Continue(p *Parser) bool {
+func (h *HorizontalRuleBlockHandler) Continue(p *Parser, container *Node) ContinueStatus {
 	// an hrule can never container > 1 line, so fail to match:
-	return true
+	return NotMatched
 }
 
 func (h *HorizontalRuleBlockHandler) Finalize(p *Parser, block *Node) {
@@ -119,7 +127,7 @@ func (h *HorizontalRuleBlockHandler) AcceptsLines() bool {
 type BlockQuoteBlockHandler struct {
 }
 
-func (h *BlockQuoteBlockHandler) Continue(p *Parser) bool {
+func (h *BlockQuoteBlockHandler) Continue(p *Parser, container *Node) ContinueStatus {
 	ln := p.currentLine
 	if !p.indented && peek(ln, p.nextNonspace) == '>' {
 		p.advanceNextNonspace()
@@ -127,9 +135,9 @@ func (h *BlockQuoteBlockHandler) Continue(p *Parser) bool {
 		if peek(ln, p.offset) == ' ' {
 			p.offset += 1
 		}
-		return true
+		return NotMatched
 	} else {
-		return false
+		return Matched
 	}
 }
 
