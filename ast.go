@@ -248,9 +248,9 @@ func (p *Parser) processInlines(doc *Node) {
 }
 
 func (p *Parser) addChild(node NodeType, offset uint32) *Node {
-	//while (!this.blocks[this.tip.type].canContain(tag)) {
-	//    this.finalize(this.tip, this.lineNumber - 1);
-	//}
+	for !blockHandlers[p.tip.Type].CanContain(node) {
+		p.finalize(p.tip, p.lineNumber-1)
+	}
 	column := offset + 1 // offset 0 = column 1
 	pos := NewSourceRange()
 	pos.line = p.lineNumber
