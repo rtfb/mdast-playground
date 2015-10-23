@@ -116,6 +116,34 @@ func (h *HorizontalRuleBlockHandler) AcceptsLines() bool {
 	return false
 }
 
+type BlockQuoteBlockHandler struct {
+}
+
+func (h *BlockQuoteBlockHandler) Continue(p *Parser) bool {
+	ln := p.currentLine
+	if !p.indented && peek(ln, p.nextNonspace) == '>' {
+		p.advanceNextNonspace()
+		p.advanceOffset(1, false)
+		if peek(ln, p.offset) == ' ' {
+			p.offset += 1
+		}
+		return true
+	} else {
+		return false
+	}
+}
+
+func (h *BlockQuoteBlockHandler) Finalize(p *Parser, block *Node) {
+}
+
+func (h *BlockQuoteBlockHandler) CanContain(t NodeType) bool {
+	return t != Item
+}
+
+func (h *BlockQuoteBlockHandler) AcceptsLines() bool {
+	return false
+}
+
 type SourceRange struct {
 	line    uint32 // line # in the source document
 	char    uint32 // char pos in line
@@ -246,6 +274,28 @@ func blockStartHrule(p *Parser, container *Node) BlockStatus {
 	}
 }
 
+func peek(line []byte, pos uint32) byte {
+	if pos < uint32(len(line)) {
+		return line[pos]
+	}
+	return 0
+}
+
+func blockStartBlockQuote(p *Parser, container *Node) BlockStatus {
+	if !p.indented && peek(p.currentLine, p.nextNonspace) == '>' {
+		p.advanceNextNonspace()
+		p.advanceOffset(1, false)
+		if peek(p.currentLine, p.offset) == ' ' {
+			p.advanceOffset(1, false)
+		}
+		p.closeUnmatchedBlocks()
+		p.addChild(BlockQuote, p.nextNonspace)
+		return ContainerMatch
+	} else {
+		return NoMatch
+	}
+}
+
 func NewParser() *Parser {
 	docNode := NewNode(Document, NewSourceRange())
 	return &Parser{
@@ -268,6 +318,9 @@ func (p *Parser) incorporateLine(line []byte) {
 	st := blockStartHeader(p, p.doc)
 	if st == NoMatch {
 		st = blockStartHrule(p, p.doc)
+		if st == NoMatch {
+			st = blockStartBlockQuote(p, p.doc)
+		}
 	}
 	//println(st)
 }

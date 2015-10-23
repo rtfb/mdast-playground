@@ -4,4 +4,6 @@ Text.
 
 ------------------
 
+> quoted text
+
 More text.
