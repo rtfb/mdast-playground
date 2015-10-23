@@ -53,7 +53,7 @@ var blockHandlers = map[NodeType]BlockHandler{
 }
 
 type BlockHandler interface {
-	Continue() bool
+	Continue(p *Parser) bool
 	Finalize(p *Parser, block *Node)
 	CanContain(t NodeType) bool
 	AcceptsLines() bool
@@ -62,7 +62,7 @@ type BlockHandler interface {
 type HeaderBlockHandler struct {
 }
 
-func (h *HeaderBlockHandler) Continue() bool {
+func (h *HeaderBlockHandler) Continue(p *Parser) bool {
 	// a header can never contain > 1 line, so fail to match:
 	return true
 }
@@ -81,7 +81,7 @@ func (h *HeaderBlockHandler) AcceptsLines() bool {
 type DocumentBlockHandler struct {
 }
 
-func (h *DocumentBlockHandler) Continue() bool {
+func (h *DocumentBlockHandler) Continue(p *Parser) bool {
 	return false
 }
 
@@ -99,7 +99,7 @@ func (h *DocumentBlockHandler) AcceptsLines() bool {
 type HorizontalRuleBlockHandler struct {
 }
 
-func (h *HorizontalRuleBlockHandler) Continue() bool {
+func (h *HorizontalRuleBlockHandler) Continue(p *Parser) bool {
 	// an hrule can never container > 1 line, so fail to match:
 	return true
 }
