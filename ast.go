@@ -244,7 +244,13 @@ const (
 	LeafMatch
 )
 
-func blockStartHeader(p *Parser, container *Node) BlockStatus {
+var blockTriggers = []func(p *Parser, container *Node) BlockStatus{
+	atxHeaderTrigger,
+	hruleTrigger,
+	blockquoteTrigger,
+}
+
+func atxHeaderTrigger(p *Parser, container *Node) BlockStatus {
 	match := reATXHeaderMarker.Find(p.currentLine[p.nextNonspace:])
 	if !p.indented && match != nil {
 		p.advanceNextNonspace()
@@ -262,7 +268,7 @@ func blockStartHeader(p *Parser, container *Node) BlockStatus {
 	return NoMatch
 }
 
-func blockStartHrule(p *Parser, container *Node) BlockStatus {
+func hruleTrigger(p *Parser, container *Node) BlockStatus {
 	match := reHrule.Find(p.currentLine[p.nextNonspace:])
 	if !p.indented && match != nil {
 		p.closeUnmatchedBlocks()
@@ -281,7 +287,7 @@ func peek(line []byte, pos uint32) byte {
 	return 0
 }
 
-func blockStartBlockQuote(p *Parser, container *Node) BlockStatus {
+func blockquoteTrigger(p *Parser, container *Node) BlockStatus {
 	if !p.indented && peek(p.currentLine, p.nextNonspace) == '>' {
 		p.advanceNextNonspace()
 		p.advanceOffset(1, false)
@@ -315,14 +321,12 @@ func (p *Parser) incorporateLine(line []byte) {
 	p.lineNumber += 1
 	p.currentLine = line
 	fmt.Printf("%3d: %s\n", p.lineNumber, string(line))
-	st := blockStartHeader(p, p.doc)
-	if st == NoMatch {
-		st = blockStartHrule(p, p.doc)
-		if st == NoMatch {
-			st = blockStartBlockQuote(p, p.doc)
+	for _, trigger := range blockTriggers {
+		st := trigger(p, p.doc)
+		if st != NoMatch {
+			break
 		}
 	}
-	//println(st)
 }
 
 func (p *Parser) finalize(block *Node, lineNumber uint32) {
