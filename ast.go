@@ -40,6 +40,55 @@ var nodeTypeNames = []string{
 	Image:      "Image",
 }
 
+var blockHandlers = map[NodeType]BlockHandler{
+	Document: &DocumentBlockHandler{},
+	Header:   &HeaderBlockHandler{},
+}
+
+type BlockHandler interface {
+	Continue() bool
+	Finalize(p *Parser, block *Node)
+	CanContain(t NodeType) bool
+	AcceptsLines() bool
+}
+
+type HeaderBlockHandler struct {
+}
+
+func (h *HeaderBlockHandler) Continue() bool {
+	// a header can never contain > 1 line, so fail to match:
+	return true
+}
+
+func (h *HeaderBlockHandler) Finalize(p *Parser, block *Node) {
+}
+
+func (h *HeaderBlockHandler) CanContain(t NodeType) bool {
+	return false
+}
+
+func (h *HeaderBlockHandler) AcceptsLines() bool {
+	return false
+}
+
+type DocumentBlockHandler struct {
+}
+
+func (h *DocumentBlockHandler) Continue() bool {
+	return false
+}
+
+func (h *DocumentBlockHandler) Finalize(p *Parser, block *Node) {
+}
+
+func (h *DocumentBlockHandler) CanContain(t NodeType) bool {
+	return t != Item
+}
+
+func (h *DocumentBlockHandler) AcceptsLines() bool {
+	return false
+}
+
 func (t NodeType) String() string {
 	return nodeTypeNames[t]
 }
