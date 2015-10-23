@@ -21,6 +21,7 @@ const (
 	Item
 	Paragraph
 	Header
+	HorizontalRule
 	Emph
 	Strong
 	Link
@@ -28,21 +29,27 @@ const (
 )
 
 var nodeTypeNames = []string{
-	Document:   "Document",
-	BlockQuote: "BlockQuote",
-	List:       "List",
-	Item:       "Item",
-	Paragraph:  "Paragraph",
-	Header:     "Header",
-	Emph:       "Emph",
-	Strong:     "Strong",
-	Link:       "Link",
-	Image:      "Image",
+	Document:       "Document",
+	BlockQuote:     "BlockQuote",
+	List:           "List",
+	Item:           "Item",
+	Paragraph:      "Paragraph",
+	Header:         "Header",
+	HorizontalRule: "HorizontalRule",
+	Emph:           "Emph",
+	Strong:         "Strong",
+	Link:           "Link",
+	Image:          "Image",
+}
+
+func (t NodeType) String() string {
+	return nodeTypeNames[t]
 }
 
 var blockHandlers = map[NodeType]BlockHandler{
-	Document: &DocumentBlockHandler{},
-	Header:   &HeaderBlockHandler{},
+	Document:       &DocumentBlockHandler{},
+	Header:         &HeaderBlockHandler{},
+	HorizontalRule: &HorizontalRuleBlockHandler{},
 }
 
 type BlockHandler interface {
@@ -89,8 +96,23 @@ func (h *DocumentBlockHandler) AcceptsLines() bool {
 	return false
 }
 
-func (t NodeType) String() string {
-	return nodeTypeNames[t]
+type HorizontalRuleBlockHandler struct {
+}
+
+func (h *HorizontalRuleBlockHandler) Continue() bool {
+	// an hrule can never container > 1 line, so fail to match:
+	return true
+}
+
+func (h *HorizontalRuleBlockHandler) Finalize(p *Parser, block *Node) {
+}
+
+func (h *HorizontalRuleBlockHandler) CanContain(t NodeType) bool {
+	return false
+}
+
+func (h *HorizontalRuleBlockHandler) AcceptsLines() bool {
+	return false
 }
 
 type SourceRange struct {
@@ -211,6 +233,19 @@ func blockStartHeader(p *Parser, container *Node) BlockStatus {
 	return NoMatch
 }
 
+func blockStartHrule(p *Parser, container *Node) BlockStatus {
+	reHrule := regexp.MustCompile("^(?:(?:\\* *){3,}|(?:_ *){3,}|(?:- *){3,}) *$")
+	match := reHrule.Find(p.currentLine[p.nextNonspace:])
+	if !p.indented && match != nil {
+		p.closeUnmatchedBlocks()
+		p.addChild(HorizontalRule, p.nextNonspace)
+		p.advanceOffset(uint32(len(p.currentLine))-p.offset, false)
+		return LeafMatch
+	} else {
+		return NoMatch
+	}
+}
+
 func NewParser() *Parser {
 	docNode := NewNode(Document, NewSourceRange())
 	return &Parser{
@@ -230,7 +265,10 @@ func (p *Parser) incorporateLine(line []byte) {
 	p.lineNumber += 1
 	p.currentLine = line
 	fmt.Printf("%3d: %s\n", p.lineNumber, string(line))
-	/*st := */ blockStartHeader(p, p.doc)
+	st := blockStartHeader(p, p.doc)
+	if st == NoMatch {
+		st = blockStartHrule(p, p.doc)
+	}
 	//println(st)
 }
 
