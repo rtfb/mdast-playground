@@ -10,6 +10,7 @@ import (
 
 var (
 	reATXHeaderMarker = regexp.MustCompile("^#{1,6}(?: +|$)")
+	reHrule           = regexp.MustCompile("^(?:(?:\\* *){3,}|(?:_ *){3,}|(?:- *){3,}) *$")
 )
 
 type NodeType int
@@ -216,8 +217,6 @@ const (
 )
 
 func blockStartHeader(p *Parser, container *Node) BlockStatus {
-	reLeft := regexp.MustCompile("^ *#+ *$")
-	reRight := regexp.MustCompile(" +#+ *$")
 	match := reATXHeaderMarker.Find(p.currentLine[p.nextNonspace:])
 	if !p.indented && match != nil {
 		p.advanceNextNonspace()
@@ -225,6 +224,8 @@ func blockStartHeader(p *Parser, container *Node) BlockStatus {
 		p.closeUnmatchedBlocks()
 		container := p.addChild(Header, p.nextNonspace)
 		container.level = uint32(len(bytes.Trim(match, " \t\n\r"))) // number of #s
+		reLeft := regexp.MustCompile("^ *#+ *$")
+		reRight := regexp.MustCompile(" +#+ *$")
 		container.content = reRight.ReplaceAll(reLeft.ReplaceAll(p.currentLine[p.offset:], []byte{}), []byte{})
 		//parser.currentLine.slice(parser.offset).replace(/^ *#+ *$/, '').replace(/ +#+ *$/, '');
 		p.advanceOffset(uint32(len(p.currentLine))-p.offset, false)
@@ -234,7 +235,6 @@ func blockStartHeader(p *Parser, container *Node) BlockStatus {
 }
 
 func blockStartHrule(p *Parser, container *Node) BlockStatus {
-	reHrule := regexp.MustCompile("^(?:(?:\\* *){3,}|(?:_ *){3,}|(?:- *){3,}) *$")
 	match := reHrule.Find(p.currentLine[p.nextNonspace:])
 	if !p.indented && match != nil {
 		p.closeUnmatchedBlocks()
