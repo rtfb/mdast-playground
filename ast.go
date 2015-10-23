@@ -70,6 +70,7 @@ type Node struct {
 	sourcePos  *SourceRange
 	content    []byte
 	level      uint32
+	open       bool
 	// ...
 }
 
@@ -83,6 +84,8 @@ func NewNode(typ NodeType, src *SourceRange) *Node {
 		next:       nil,
 		sourcePos:  src,
 		content:    nil,
+		level:      0,
+		open:       true,
 	}
 }
 
@@ -182,7 +185,14 @@ func (p *Parser) incorporateLine(line []byte) {
 	//println(st)
 }
 
-func (p *Parser) finalize(block *Node, numLines uint32) {
+func (p *Parser) finalize(block *Node, lineNumber uint32) {
+	above := block.parent
+	block.open = false
+	//block.sourcepos[1] = [lineNumber, this.lastLineLength];
+	block.sourcePos.endLine = lineNumber
+	block.sourcePos.endChar = p.lastLineLength
+	blockHandlers[block.Type].Finalize(p, block)
+	p.tip = above
 }
 
 func (p *Parser) processInlines(doc *Node) {
