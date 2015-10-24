@@ -244,6 +244,22 @@ type Parser struct {
 	blank                bool
 }
 
+func NewParser() *Parser {
+	docNode := NewNode(Document, NewSourceRange())
+	return &Parser{
+		doc:                  docNode,
+		tip:                  docNode,
+		oldTip:               docNode,
+		lineNumber:           0,
+		lastLineLength:       0,
+		offset:               0,
+		column:               0,
+		lastMatchedContainer: docNode,
+		currentLine:          []byte{},
+		lines:                nil,
+	}
+}
+
 type BlockStatus int
 
 const (
@@ -307,21 +323,6 @@ func blockquoteTrigger(p *Parser, container *Node) BlockStatus {
 		return ContainerMatch
 	} else {
 		return NoMatch
-	}
-}
-
-func NewParser() *Parser {
-	docNode := NewNode(Document, NewSourceRange())
-	return &Parser{
-		doc:                  docNode,
-		tip:                  docNode,
-		lineNumber:           0,
-		lastLineLength:       0,
-		offset:               0,
-		column:               0,
-		lastMatchedContainer: docNode,
-		currentLine:          []byte{},
-		lines:                nil,
 	}
 }
 
