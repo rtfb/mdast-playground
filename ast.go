@@ -227,8 +227,9 @@ func (n *Node) appendChild(child *Node) {
 }
 
 type Parser struct {
-	doc *Node
-	tip *Node // = doc
+	doc    *Node
+	tip    *Node // = doc
+	oldTip *Node
 	//refmap
 	lineNumber           uint32
 	lastLineLength       uint32
@@ -242,6 +243,7 @@ type Parser struct {
 	indent               uint32
 	indented             bool
 	blank                bool
+	allClosed            bool
 }
 
 func NewParser() *Parser {
@@ -257,6 +259,7 @@ func NewParser() *Parser {
 		lastMatchedContainer: docNode,
 		currentLine:          []byte{},
 		lines:                nil,
+		allClosed:            true,
 	}
 }
 
@@ -396,7 +399,14 @@ func (p *Parser) advanceNextNonspace() {
 }
 
 func (p *Parser) closeUnmatchedBlocks() {
-	// TODO
+	if !p.allClosed {
+		for p.oldTip != p.lastMatchedContainer {
+			parent := p.oldTip.parent
+			p.finalize(p.oldTip, p.lineNumber-1)
+			p.oldTip = parent
+		}
+		p.allClosed = true
+	}
 }
 
 func (p *Parser) findNextNonspace() {
