@@ -374,11 +374,11 @@ func (p *Parser) advanceOffset(count uint32, columns bool) {
 	var cols uint32 = 0
 	for {
 		if columns {
-			if cols < count {
+			if cols >= count {
 				break
 			}
 		} else {
-			if i < count {
+			if i >= count {
 				break
 			}
 		}
