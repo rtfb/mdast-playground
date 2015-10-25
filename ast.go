@@ -135,10 +135,10 @@ func (h *BlockQuoteBlockHandler) Continue(p *Parser, container *Node) ContinueSt
 		if peek(ln, p.offset) == ' ' {
 			p.offset += 1
 		}
-		return NotMatched
 	} else {
-		return Matched
+		return NotMatched
 	}
+	return Matched
 }
 
 func (h *BlockQuoteBlockHandler) Finalize(p *Parser, block *Node) {
