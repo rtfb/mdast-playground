@@ -51,6 +51,7 @@ var blockHandlers = map[NodeType]BlockHandler{
 	Document:       &DocumentBlockHandler{},
 	Header:         &HeaderBlockHandler{},
 	HorizontalRule: &HorizontalRuleBlockHandler{},
+	BlockQuote:     &BlockQuoteBlockHandler{},
 }
 
 type ContinueStatus int
