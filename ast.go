@@ -331,12 +331,57 @@ func blockquoteTrigger(p *Parser, container *Node) BlockStatus {
 }
 
 func (p *Parser) incorporateLine(line []byte) {
+	allMatched := true
+	container := p.doc
+	p.oldTip = p.tip
+	p.offset = 0
 	p.lineNumber += 1
 	p.currentLine = line
 	fmt.Printf("%3d: %s\n", p.lineNumber, string(line))
-	for _, trigger := range blockTriggers {
-		st := trigger(p, p.doc)
-		if st != NoMatch {
+	lastChild := container.lastChild
+	for lastChild != nil && lastChild.open {
+		container = lastChild
+		p.findNextNonspace()
+		switch blockHandlers[container.Type].Continue(p, container) {
+		case Matched: // matched, keep going
+			break
+		case NotMatched: // failed to match a block
+			allMatched = false
+			break
+		case Completed: // we've hit end of line for fenced code close and can return
+			p.lastLineLength = uint32(len(line))
+			return
+		default:
+			panic("Continue returned illegal value, must be 0, 1, or 2")
+		}
+		if !allMatched {
+			container = container.parent // back up to last matching block
+			break
+		}
+	}
+	p.allClosed = container == p.oldTip
+	p.lastMatchedContainer = container
+	matchedLeaf := container.Type != Paragraph && blockHandlers[container.Type].AcceptsLines()
+	for !matchedLeaf {
+		p.findNextNonspace()
+		//if !p.indented && reMaybeSpecial.Find(line[p.nextNonspace:]) == nil {
+		//	p.advanceNextNonspace()
+		//	break
+		//}
+		nothingMatched := true
+		for _, trigger := range blockTriggers {
+			st := trigger(p, container)
+			if st != NoMatch {
+				container = p.tip
+				nothingMatched = false
+				if st == LeafMatch {
+					matchedLeaf = true
+				}
+				break
+			}
+		}
+		if nothingMatched {
+			p.advanceNextNonspace()
 			break
 		}
 	}
