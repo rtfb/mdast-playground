@@ -27,6 +27,7 @@ const (
 	Strong
 	Link
 	Image
+	Text
 )
 
 var nodeTypeNames = []string{
@@ -41,6 +42,7 @@ var nodeTypeNames = []string{
 	Strong:         "Strong",
 	Link:           "Link",
 	Image:          "Image",
+	Text:           "Text",
 }
 
 func (t NodeType) String() string {
@@ -217,7 +219,7 @@ type Node struct {
 	open       bool
 	//isFenced      bool
 	lastLineBlank bool
-	// ...
+	literal       []byte
 }
 
 func NewNode(typ NodeType, src *SourceRange) *Node {
@@ -234,6 +236,7 @@ func NewNode(typ NodeType, src *SourceRange) *Node {
 		open:       true,
 		//isFenced:      false,
 		lastLineBlank: false,
+		literal:       nil,
 	}
 }
 
@@ -284,6 +287,7 @@ type Parser struct {
 	indented             bool
 	blank                bool
 	allClosed            bool
+	inlineParser         *InlineParser
 }
 
 func NewParser() *Parser {
@@ -300,6 +304,7 @@ func NewParser() *Parser {
 		currentLine:          []byte{},
 		lines:                nil,
 		allClosed:            true,
+		inlineParser:         NewInlineParser(),
 	}
 }
 
@@ -468,7 +473,13 @@ func (p *Parser) finalize(block *Node, lineNumber uint32) {
 	p.tip = above
 }
 
-func (p *Parser) processInlines(doc *Node) {
+func (p *Parser) processInlines(ast *Node) {
+	if ast.Type == Paragraph || ast.Type == Header {
+		p.inlineParser.parse(ast)
+	}
+	for n := ast.firstChild; n != nil; n = n.next {
+		p.processInlines(n)
+	}
 }
 
 func (p *Parser) addLine() {
@@ -565,9 +576,9 @@ func (p *Parser) parse(input []byte) *Node {
 	for i = 0; i < numLines; i += 1 {
 		p.incorporateLine(p.lines[i])
 	}
-	//for p.tip != nil {
-	//	p.finalize(p.tip, numLines)
-	//}
+	for p.tip != nil {
+		p.finalize(p.tip, numLines)
+	}
 	p.processInlines(p.doc)
 	return p.doc
 }
@@ -577,7 +588,11 @@ func dump(ast *Node, depth int) {
 	for i := 0; i < depth; i += 1 {
 		indent += "\t"
 	}
-	fmt.Printf("%s%s\n", indent, ast.Type)
+	content := ast.literal
+	if content == nil {
+		content = ast.content
+	}
+	fmt.Printf("%s%s (%q)\n", indent, ast.Type, content)
 	//fmt.Printf("%s%#v\n", indent, ast)
 	//fmt.Printf("%s%#v\n", indent, ast.firstChild)
 	for n := ast.firstChild; n != nil; n = n.next {

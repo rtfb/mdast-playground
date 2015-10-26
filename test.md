@@ -6,4 +6,4 @@ Text.
 
 > quoted text
 
-More text.
+More text. *MORE*!
