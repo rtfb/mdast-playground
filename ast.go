@@ -52,6 +52,7 @@ var blockHandlers = map[NodeType]BlockHandler{
 	Header:         &HeaderBlockHandler{},
 	HorizontalRule: &HorizontalRuleBlockHandler{},
 	BlockQuote:     &BlockQuoteBlockHandler{},
+	Paragraph:      &ParagraphBlockHandler{},
 }
 
 type ContinueStatus int
@@ -153,6 +154,40 @@ func (h *BlockQuoteBlockHandler) AcceptsLines() bool {
 	return false
 }
 
+type ParagraphBlockHandler struct {
+}
+
+func (h *ParagraphBlockHandler) Continue(p *Parser, container *Node) ContinueStatus {
+	if p.blank {
+		return NotMatched
+	} else {
+		return Matched
+	}
+}
+
+func (h *ParagraphBlockHandler) Finalize(p *Parser, block *Node) {
+	/*
+		TODO:
+			hasReferenceDefs := false
+			for peek(block.content, 0) == '[' &&
+				(pos := p.inlineParser.parseReference(block.content, p.refmap); pos != 0) {
+				block.content = block.content[pos:]
+				hasReferenceDefs = true
+			}
+			if hasReferenceDefs && isBlank(block.content) {
+				block.unlink()
+			}
+	*/
+}
+
+func (h *ParagraphBlockHandler) CanContain(t NodeType) bool {
+	return false
+}
+
+func (h *ParagraphBlockHandler) AcceptsLines() bool {
+	return true
+}
+
 type SourceRange struct {
 	line    uint32 // line # in the source document
 	char    uint32 // char pos in line
@@ -180,6 +215,8 @@ type Node struct {
 	content    []byte
 	level      uint32
 	open       bool
+	//isFenced      bool
+	lastLineBlank bool
 	// ...
 }
 
@@ -195,6 +232,8 @@ func NewNode(typ NodeType, src *SourceRange) *Node {
 		content:    nil,
 		level:      0,
 		open:       true,
+		//isFenced:      false,
+		lastLineBlank: false,
 	}
 }
 
@@ -385,6 +424,38 @@ func (p *Parser) incorporateLine(line []byte) {
 			break
 		}
 	}
+	if !p.allClosed && !p.blank && p.tip.Type == Paragraph {
+		p.addLine()
+	} else {
+		p.closeUnmatchedBlocks()
+		if p.blank && container.lastChild != nil {
+			container.lastChild.lastLineBlank = true
+		}
+		t := container.Type
+		lastLineBlank := p.blank /* &&
+		!(t == BlockQuote || (t == CodeBlock && container.isFenced) ||
+			(t == Item && container.firstChild == nil && container.sourcePos.line == p.lineNumber))
+		*/
+		cont := container
+		for cont != nil {
+			cont.lastLineBlank = lastLineBlank
+			cont = cont.parent
+		}
+		if blockHandlers[t].AcceptsLines() {
+			p.addLine()
+			//if t == HtmlBlock &&
+			//	container.htmlBlockType >= 1 &&
+			//	container.htmlBlockType <= 5 &&
+			//	reHtmlBlockClose() {
+			//	p.finalize(container, p.lineNumber)
+			//}
+		} else if p.offset < uint32(len(line)) && !p.blank {
+			container = p.addChild(Paragraph, p.offset)
+			p.advanceNextNonspace()
+			p.addLine()
+		}
+	}
+	p.lastLineLength = uint32(len(line))
 }
 
 func (p *Parser) finalize(block *Node, lineNumber uint32) {
@@ -398,6 +469,11 @@ func (p *Parser) finalize(block *Node, lineNumber uint32) {
 }
 
 func (p *Parser) processInlines(doc *Node) {
+}
+
+func (p *Parser) addLine() {
+	p.tip.content = append(p.tip.content, p.currentLine[p.offset:]...)
+	p.tip.content = append(p.tip.content, '\n')
 }
 
 func (p *Parser) addChild(node NodeType, offset uint32) *Node {
