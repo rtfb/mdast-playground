@@ -269,6 +269,81 @@ func (n *Node) appendChild(child *Node) {
 	}
 }
 
+func (n *Node) isContainer() bool {
+	switch n.Type {
+	case Document:
+		fallthrough
+	case BlockQuote:
+		fallthrough
+	case List:
+		fallthrough
+	case Item:
+		fallthrough
+	case Paragraph:
+		fallthrough
+	case Header:
+		fallthrough
+	case Emph:
+		fallthrough
+	case Strong:
+		fallthrough
+	case Link:
+		fallthrough
+	case Image:
+		return true
+	default:
+		return false
+	}
+	return false
+}
+
+type NodeWalker struct {
+	current  *Node
+	root     *Node
+	entering bool
+}
+
+func NewNodeWalker(root *Node) *NodeWalker {
+	return &NodeWalker{
+		current:  root,
+		root:     nil,
+		entering: true,
+	}
+}
+
+func (nw *NodeWalker) next() (*Node, bool) {
+	if nw.current == nil {
+		return nil, false
+	}
+	if nw.root == nil {
+		nw.root = nw.current
+		return nw.current, nw.entering
+	}
+	if nw.entering && nw.current.isContainer() {
+		if nw.current.firstChild != nil {
+			nw.current = nw.current.firstChild
+			nw.entering = true
+		} else {
+			nw.entering = false
+		}
+	} else if nw.current.next == nil {
+		nw.current = nw.current.parent
+		nw.entering = false
+	} else {
+		nw.current = nw.current.next
+		nw.entering = true
+	}
+	if nw.current == nw.root {
+		return nil, false
+	}
+	return nw.current, nw.entering
+}
+
+func (nw *NodeWalker) resumeAt(node *Node, entering bool) {
+	nw.current = node
+	nw.entering = entering
+}
+
 type Parser struct {
 	doc    *Node
 	tip    *Node // = doc
@@ -474,11 +549,11 @@ func (p *Parser) finalize(block *Node, lineNumber uint32) {
 }
 
 func (p *Parser) processInlines(ast *Node) {
-	if ast.Type == Paragraph || ast.Type == Header {
-		p.inlineParser.parse(ast)
-	}
-	for n := ast.firstChild; n != nil; n = n.next {
-		p.processInlines(n)
+	walker := NewNodeWalker(ast)
+	for node := ast; node != nil; node, _ = walker.next() {
+		if node.Type == Paragraph || node.Type == Header {
+			p.inlineParser.parse(node)
+		}
 	}
 }
 
@@ -583,21 +658,54 @@ func (p *Parser) parse(input []byte) *Node {
 	return p.doc
 }
 
+func forEachNode(root *Node, f func(node *Node, entering bool)) {
+	walker := NewNodeWalker(root)
+	node, entering := walker.next()
+	for node != nil {
+		f(node, entering)
+		node, entering = walker.next()
+	}
+}
+
 func dump(ast *Node, depth int) {
-	indent := ""
-	for i := 0; i < depth; i += 1 {
-		indent += "\t"
-	}
-	content := ast.literal
-	if content == nil {
-		content = ast.content
-	}
-	fmt.Printf("%s%s (%q)\n", indent, ast.Type, content)
-	//fmt.Printf("%s%#v\n", indent, ast)
-	//fmt.Printf("%s%#v\n", indent, ast.firstChild)
-	for n := ast.firstChild; n != nil; n = n.next {
-		dump(n, depth+1)
-	}
+	forEachNode(ast, func(node *Node, entering bool) {
+		indent := ""
+		content := node.literal
+		if content == nil {
+			content = node.content
+		}
+		fmt.Printf("%s%s (%q)\n", indent, node.Type, content)
+	})
+	/*
+		walker := NewNodeWalker(ast)
+		_, node := walker.next()
+		//for node := ast; node != nil; _, node = walker.next() {
+		for node != nil {
+			indent := ""
+			content := node.literal
+			if content == nil {
+				content = node.content
+			}
+			fmt.Printf("%s%s (%q)\n", indent, node.Type, content)
+			_, node = walker.next()
+		}
+	*/
+	/*
+		indent := ""
+		for i := 0; i < depth; i += 1 {
+			indent += "\t"
+		}
+		content := ast.literal
+		if content == nil {
+			content = ast.content
+		}
+		fmt.Printf("%s%s (%q)\n", indent, ast.Type, content)
+		//fmt.Printf("%s%#v\n", indent, ast)
+		//fmt.Printf("%s%#v\n", indent, ast.firstChild)
+		for n := ast.firstChild; n != nil; n = n.next {
+			dump(n, depth+1)
+		}
+	*/
 }
 
 func main() {
