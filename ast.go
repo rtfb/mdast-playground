@@ -721,4 +721,6 @@ func main() {
 	p := NewParser()
 	ast := p.parse(bytes)
 	dump(ast, 0)
+	println("================")
+	println(string(render(ast)))
 }
